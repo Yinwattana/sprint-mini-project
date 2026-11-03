@@ -2,7 +2,6 @@ package co.istad.restfulemployeeapi.repository;
 
 import co.istad.restfulemployeeapi.domain.Employee;
 import lombok.Getter;
-import org.springframework.cglib.core.Local;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;

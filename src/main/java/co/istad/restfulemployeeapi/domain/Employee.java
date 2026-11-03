@@ -15,8 +15,6 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class Employee {
 
-    private static int nextId = 3;
-
     private Integer id;
 
     private String name;
@@ -28,14 +26,5 @@ public class Employee {
     private LocalDate hireDate;
 
     private Boolean isActive;
-
-    public Employee(String name, String email, BigDecimal salary, LocalDate hireDate) {
-        this.id = nextId++;
-        this.name = name;
-        this.email = email;
-        this.salary = salary;
-        this.hireDate = hireDate;
-        this.isActive = Boolean.TRUE;
-    }
 
 }

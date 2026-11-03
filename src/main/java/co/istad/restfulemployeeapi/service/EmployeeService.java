@@ -12,6 +12,8 @@ public interface EmployeeService {
     List<EmployeeResponse> getAll();
     EmployeeResponse getEmployeeById(Integer id);
 
+    List<EmployeeResponse> searchEmployeesByName(String name);
+
     EmployeeResponse createEmployee(CreateEmployeeRequest employeeRequest);
 
     EmployeeResponse updateEmployeeById(Integer id, UpdateEmployeeRequest updateEmployeeRequest);

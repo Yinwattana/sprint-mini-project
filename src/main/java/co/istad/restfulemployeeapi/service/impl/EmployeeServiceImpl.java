@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -20,66 +21,73 @@ public class EmployeeServiceImpl implements EmployeeService {
 
     private final EmployeeRepository repository;
     private final EmployeeMapper employeeMapper;
+    private int nextId = 3;
 
-    private static int nextId = 3;
-
+    // Keep reads and writes to the shared in-memory list atomic.
     @Override
-    public List<EmployeeResponse> getAll() {
-        return repository.getEmployees()
-                .stream()
+    public synchronized List<EmployeeResponse> getAll() {
+        return repository.getEmployees().stream()
                 .map(employeeMapper::toResponse)
-                // emp -> mapper.toResponse(emp)
                 .toList();
     }
 
     @Override
-    public EmployeeResponse getEmployeeById(Integer id) {
-        return repository.getEmployees()
-                .stream()
-                .filter(emp -> emp.getId().equals(id))
-                .findFirst()
-                .map(employeeMapper::toResponse)
-                .orElseThrow(
-                        () -> new ResponseStatusException(
-                                HttpStatus.NOT_FOUND,
-                                "Employee with id: %d not found".formatted(id)
-                        )
-                );
+    public synchronized EmployeeResponse getEmployeeById(Integer id) {
+        return employeeMapper.toResponse(findEmployeeById(id));
     }
 
     @Override
-    public EmployeeResponse createEmployee(CreateEmployeeRequest employeeRequest) {
+    public synchronized List<EmployeeResponse> searchEmployeesByName(String name) {
+        String keyword = name.strip().toLowerCase(Locale.ROOT);
+        return repository.getEmployees().stream()
+                .filter(employee -> employee.getName().toLowerCase(Locale.ROOT).contains(keyword))
+                .map(employeeMapper::toResponse)
+                .toList();
+    }
 
-        if (checkIfEmailExists(employeeRequest.email())) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "Email already exists"
-            );
-        }
+    @Override
+    public synchronized EmployeeResponse createEmployee(CreateEmployeeRequest employeeRequest) {
+        validateUniqueEmail(employeeRequest.email(), null);
 
         Employee employee = employeeMapper.fromCreateEmployeeRequest(employeeRequest);
         employee.setId(nextId++);
         employee.setIsActive(Boolean.TRUE);
-
         repository.getEmployees().add(employee);
 
         return employeeMapper.toResponse(employee);
     }
 
     @Override
-    public EmployeeResponse updateEmployeeById(Integer id, UpdateEmployeeRequest updateEmployeeRequest) {
-        return null;
+    public synchronized EmployeeResponse updateEmployeeById(Integer id, UpdateEmployeeRequest request) {
+        Employee employee = findEmployeeById(id);
+        // The current employee can keep their own email address.
+        validateUniqueEmail(request.email(), id);
+        employeeMapper.updateEmployeeFromRequest(request, employee);
+        return employeeMapper.toResponse(employee);
     }
 
     @Override
-    public void deleteEmployeeById(Integer id) {
-
+    public synchronized void deleteEmployeeById(Integer id) {
+        Employee employee = findEmployeeById(id);
+        repository.getEmployees().remove(employee);
     }
 
-    private boolean checkIfEmailExists(String email) {
-        return repository.getEmployees()
-                .stream()
-                .anyMatch(emp -> emp.getEmail().equals(email));
+    private Employee findEmployeeById(Integer id) {
+        return repository.getEmployees().stream()
+                .filter(employee -> employee.getId().equals(id))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Employee with id: %d not found".formatted(id)
+                ));
     }
 
+    private void validateUniqueEmail(String email, Integer excludedId) {
+        boolean exists = repository.getEmployees().stream()
+                .anyMatch(employee -> !employee.getId().equals(excludedId)
+                        && employee.getEmail().equalsIgnoreCase(email));
+        if (exists) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
+        }
+    }
 }
